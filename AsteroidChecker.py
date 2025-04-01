@@ -90,6 +90,7 @@ class AsteroidChecker:
     def get_asteroid_list(self, frame_wcs, time_jd):
 
         earth = kete.spice.get_state("Earth", time_jd)
+        print(earth)
 
 
         fov = kete.fov.RectangleFOV.from_wcs(frame_wcs, earth)
@@ -110,8 +111,6 @@ if __name__=="__main__":
 
     # Feb 4, 2025
     jd = kete.Time.from_ymd(2025, 2, 23).jd
-
-    print(jd)
 
     # Load a fits
     frame = fits.open("ngc2403_V_dr4.fits")[0]
@@ -136,8 +135,6 @@ if __name__=="__main__":
     end_time = time.perf_counter()
     elapsed_time = end_time - start_time
     print(f"Elapsed time: {elapsed_time:.4f} seconds")
-
-    ac.save_states_to_db()
 
     start_time = time.perf_counter()
     # Code to be timed
