@@ -33,18 +33,6 @@ class AsteroidChecker:
         # Save the states to a database.
         self.save_states_to_db()
 
-    #@profile
-    def propagate_asteroids(self, time_jd):
-        """
-        Propagate the asteroids to the some time.
-        
-        :param time_jd: The current time in JD.
-        """
-
-        # Update the states based on the time. 
-        self.mpc_states = kete.propagate_n_body(self.mpc_states, time_jd)
-
-
     def save_states_to_db(self, filename=default_db_file):
 
         designations = []
@@ -53,7 +41,6 @@ class AsteroidChecker:
         dec = []
         positions = []
         velocities = []
-
 
         for state in self.mpc_states:
 
@@ -88,41 +75,58 @@ class AsteroidChecker:
             self.mpc_states.append(state)
 
     #@profile
+    def propagate_asteroids(self, time_jd):
+        """
+        Propagate the asteroids to the some time.
+        
+        :param time_jd: The current time in JD.
+        """
+
+        # Update the states based on the time. 
+        self.mpc_states = kete.propagate_n_body(self.mpc_states, time_jd)
+
+
+    #@profile
     def get_asteroid_list(self, frame_wcs, time_jd):
 
-        corners = []
-        dx, dy = frame_wcs.pixel_shape
-        for x, y in zip([0, 0, dx, dx], [0, dy, dy, 0]):
-            coord = frame_wcs.pixel_to_world(x, y).icrs
-            corners.append(kete.Vector.from_ra_dec(coord.ra.deg, coord.dec.deg))
+        earth = kete.spice.get_state("Earth", time_jd)
 
-        fov = kete.fov.RectangleFOV.from_corners(corners, earth)
+
+        fov = kete.fov.RectangleFOV.from_wcs(frame_wcs, earth)
 
         # Update the states based on the time. 
         self.propagate_asteroids(time_jd)
 
         # Check the FOV for asteroids.
-        asteroid_list = kete.fov_state_check(self.mpc_states, [fov], include_asteroids=True)
+        asteroid_list = kete.fov_state_check(self.mpc_states, [fov])
 
         return asteroid_list
 
     def cross_match_sources_with_asteroids(self, asteroid_list, sources, radius_threshold):
         
-        pass
+        raise NotImplementedError
 
 if __name__=="__main__":
 
     # Feb 4, 2025
     jd = kete.Time.from_ymd(2025, 2, 23).jd
-    earth = kete.spice.get_state("Earth", jd)
+
+    print(jd)
 
     # Load a fits
     frame = fits.open("ngc2403_V_dr4.fits")[0]
     frame_wcs = WCS(frame.header)
 
-
     import time
+    start_time = time.perf_counter()
+    # Code to be timed
+
     ac = AsteroidChecker()
+
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time: {elapsed_time:.4f} seconds")
+
 
     start_time = time.perf_counter()
     # Code to be timed
@@ -144,14 +148,6 @@ if __name__=="__main__":
     elapsed_time = end_time - start_time
     print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
-    start_time = time.perf_counter()
-    # Code to be timed
-
-    print(ac.get_asteroid_list(frame_wcs, kete.Time.from_ymd(2025, 2, 25).jd))
-
-    end_time = time.perf_counter()
-    elapsed_time = end_time - start_time
-    print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
 
 
