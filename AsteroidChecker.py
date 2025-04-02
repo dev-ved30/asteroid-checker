@@ -1,33 +1,42 @@
 import kete
+import psycopg2
 
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.table import Table
 
-from AsteroidDB import default_db_file
+from AsteroidDB import db_params
 
 
 class AsteroidChecker:
 
     def __init__(self):
         
-        # TODO: Establish a connection to the database.
+        # Load the database table and convert to states
         self.load_states_from_db()
     
-    def load_states_from_db(self, filename=default_db_file):
+    def load_states_from_db(self, db_params=db_params):
 
-        # TODO: Load this from a database instead. Can do this for only some ra and dec.
-        try:
-            self.state_table = Table.read(filename)
-        except FileNotFoundError:
-            print(f"File {filename} not found. Make sure to download the orbit data first.")
+        conn = psycopg2.connect(**db_params)
+        cursor = conn.cursor()
 
-        # Convert the table to a list of states.
+        # TODO See if we can apply cuts based on ra/dec and proper motion
+        cursor.execute("SELECT * FROM asteroids;")
+        rows = cursor.fetchall()
+
+
+        # Convert rows into sate objects
         self.mpc_states = []
-        for row in self.state_table:
-            state = kete.State(row['designations'], row['jd'], kete.vector.Vector(row['position']), kete.vector.Vector(row['velocity']), frame=kete.vector.Frames.Equatorial)
+        for row in rows:
+            
+            designation, jd, ra, dec, position_x, position_y, position_z, velocity_x, velocity_y, velocity_z = row
+            state = kete.State(designation, jd, kete.vector.Vector([position_x, position_y, position_z]), \
+                               kete.vector.Vector([velocity_x, velocity_y, velocity_z]), frame=kete.vector.Frames.Equatorial)
             self.mpc_states.append(state)
-
+        
+        # Close the connection
+        cursor.close()
+        conn.close()
 
     def get_asteroid_list(self, frame_wcs, time_jd):
 

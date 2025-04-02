@@ -1,13 +1,57 @@
 import time
 import kete
+import psycopg2
 
 from astropy.table import Table
 
+# Database connection parameters
+db_params = {
+    "dbname": "asteroid",
+    "user": "postgres",  # Change to your PostgreSQL username
+    "host": "localhost",  # Change if PostgreSQL is hosted remotely
+    "port": "5432"  # Default PostgreSQL port
+}
 
-default_db_file = "states.ecsv"
+def create_database_table(db_params=db_params):
+    """
+    Create a database table to store the asteroid data.
+    """
+    try:
+        # Establish connection
+        conn = psycopg2.connect(**db_params)
+        cursor = conn.cursor()
+        
+        # Create table if it doesn't exist
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS asteroids (
+                designation TEXT PRIMARY KEY,
+                jd FLOAT NOT NULL,
+                ra FLOAT NOT NULL,
+                dec FLOAT NOT NULL,
+                position_x FLOAT NOT NULL,
+                position_y FLOAT NOT NULL,
+                position_z FLOAT NOT NULL,
+                velocity_x FLOAT NOT NULL,
+                velocity_y FLOAT NOT NULL,
+                velocity_z FLOAT NOT NULL
+            );
+        """)
+        conn.commit()
+
+        # Close the connection
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+
+        print("Error creating database table:", e)
 
 
-def download_and_update_db(time_jd, filename=default_db_file):
+def download_and_update_db(time_jd, db_params=db_params):
+
+    # Establish connection
+    conn = psycopg2.connect(**db_params)
+    cursor = conn.cursor()
 
     # Load orbit data from the MPC
     mpc_obs = kete.mpc.fetch_known_orbit_data(force_download=True)
@@ -20,31 +64,22 @@ def download_and_update_db(time_jd, filename=default_db_file):
 
     # Convert the states from ecliptic to equatorial to easily access the RA and Dec.
     for i, state in enumerate(mpc_states):
-        mpc_states[i] = state.as_equatorial
 
-    # Save the states to a database.
-    designations = []
-    jd = []
-    ra = []
-    dec = []
-    positions = []
-    velocities = []
+        # Convert the state to equatorial coordinates.
+        s =  state.as_equatorial
 
-    for state in mpc_states:
+        # Add the state to the database.
+        cursor.execute("INSERT INTO asteroids (designation, jd, ra, dec, position_x, position_y, position_z, velocity_x, velocity_y, velocity_z) VALUES \
+                       (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (s.desig, s.jd, s.pos.ra, s.pos.dec, s.pos.x, s.pos.y, s.pos.z, s.vel.x, s.vel.y, s.vel.z))
 
-        designations.append(state.desig)
-        jd.append(state.jd)
-        ra.append(state.pos.ra)
-        dec.append(state.pos.dec)
-        positions.append(state.pos) # Position of the object in AU with respect to the central object.
-        velocities.append(state.vel) # Velocity of the object in AU/Day.
 
-    # TODO: Replace this with storing to a database
-    state_table = Table([designations, jd, ra, dec, positions, velocities],
-        names=['designations', 'jd', 'ra', 'dec', 'position', 'velocity'])
-    
-    # TODO: Store this in a database instead.
-    state_table.write(filename, format='ascii.ecsv', overwrite=True)
+    conn.commit()
+
+
+
+    # Close the connection
+    cursor.close()
+    conn.close()
 
 if __name__=="__main__":
 
@@ -52,7 +87,10 @@ if __name__=="__main__":
 
     # Feb 4, 2025
     jd = kete.Time.from_ymd(2025, 2, 23).jd
+    
+    #create_database_table()
     download_and_update_db(jd)
+
     
     end_time = time.perf_counter()
 
