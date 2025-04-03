@@ -7,7 +7,7 @@ from astropy.table import Table
 # Database connection parameters
 db_params = {
     "dbname": "asteroid",
-    "user": "postgres",  # Change to your PostgreSQL username
+    "user": "vedshah",  # Change to your PostgreSQL username
     "host": "localhost",  # Change if PostgreSQL is hosted remotely
     "port": "5432"  # Default PostgreSQL port
 }
@@ -63,19 +63,18 @@ def download_and_update_db(time_jd, db_params=db_params):
     mpc_states = kete.propagate_n_body(mpc_states, time_jd)
 
     # Convert the states from ecliptic to equatorial to easily access the RA and Dec.
-    for i, state in enumerate(mpc_states):
+    for i, s in enumerate(mpc_states):
 
         # Convert the state to equatorial coordinates.
-        s =  state.as_equatorial
+        ra = s.as_equatorial.pos.ra
+        dec = s.as_equatorial.pos.dec
 
         # Add the state to the database.
         cursor.execute("INSERT INTO asteroids (designation, jd, ra, dec, position_x, position_y, position_z, velocity_x, velocity_y, velocity_z) VALUES \
-                       (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (s.desig, s.jd, s.pos.ra, s.pos.dec, s.pos.x, s.pos.y, s.pos.z, s.vel.x, s.vel.y, s.vel.z))
+                       (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (s.desig, s.jd, ra, dec, s.pos.x, s.pos.y, s.pos.z, s.vel.x, s.vel.y, s.vel.z))
 
 
     conn.commit()
-
-
 
     # Close the connection
     cursor.close()
@@ -88,7 +87,7 @@ if __name__=="__main__":
     # Feb 4, 2025
     jd = kete.Time.from_ymd(2025, 2, 23).jd
     
-    #create_database_table()
+    create_database_table()
     download_and_update_db(jd)
 
     

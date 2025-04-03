@@ -17,26 +17,30 @@ class AsteroidChecker:
     
     def load_states_from_db(self, db_params=db_params):
 
-        conn = psycopg2.connect(**db_params)
-        cursor = conn.cursor()
+        try:
+            conn = psycopg2.connect(**db_params)
+            cursor = conn.cursor()
 
-        # TODO See if we can apply cuts based on ra/dec and proper motion
-        cursor.execute("SELECT * FROM asteroids;")
-        rows = cursor.fetchall()
+            # TODO See if we can apply cuts based on ra/dec and proper motion
+            cursor.execute("SELECT * FROM asteroids;")
+            rows = cursor.fetchall()
 
 
-        # Convert rows into sate objects
-        self.mpc_states = []
-        for row in rows:
+            # Convert rows into sate objects
+            self.mpc_states = []
+            for row in rows:
+                
+                designation, jd, ra, dec, position_x, position_y, position_z, velocity_x, velocity_y, velocity_z = row
+                state = kete.State(designation, jd, kete.vector.Vector([position_x, position_y, position_z]), \
+                                kete.vector.Vector([velocity_x, velocity_y, velocity_z]))
+                self.mpc_states.append(state)
             
-            designation, jd, ra, dec, position_x, position_y, position_z, velocity_x, velocity_y, velocity_z = row
-            state = kete.State(designation, jd, kete.vector.Vector([position_x, position_y, position_z]), \
-                               kete.vector.Vector([velocity_x, velocity_y, velocity_z]), frame=kete.vector.Frames.Equatorial)
-            self.mpc_states.append(state)
-        
-        # Close the connection
-        cursor.close()
-        conn.close()
+            # Close the connection
+            cursor.close()
+            conn.close()
+
+        except Exception as e:
+            print("Error connecting to database:", e)
 
     def get_asteroid_list(self, frame_wcs, time_jd):
 
@@ -48,7 +52,7 @@ class AsteroidChecker:
         self.mpc_states = kete.propagate_n_body(self.mpc_states, time_jd)
 
         # Check the FOV for asteroids.
-        asteroid_list = kete.fov_state_check(self.mpc_states, [fov])
+        asteroid_list = kete.fov_state_check(self.mpc_states, [fov], dt_limit=0)
 
         return asteroid_list
 
